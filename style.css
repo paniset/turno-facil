@@ -11,3 +11,12 @@ button{min-height:44px;min-width:44px}
 @media print{.guia header,.guia footer,.cta,.migas,.relacionadas,.skip-link{display:none!important}.guia .tabla-scroll{overflow:visible}.tabla-scroll .cuadrante:has(thead th){min-width:0}}
 .otras{display:block;flex-basis:100%;margin-top:.6rem;font-size:.9em}
 .otras a{color:inherit}
+.ventajas{display:flex;flex-wrap:wrap;gap:.5rem;list-style:none;padding:0;margin:1rem 0}
+.ventajas li{border:1px solid currentColor;border-radius:999px;padding:.2rem .7rem;font-size:.9em}
+.atajos{font-size:.95em}
+.faq h3{margin-bottom:.2rem}
+.faq p{margin-top:.2rem}
+.intro-texto{max-width:400px}
+.intro .intro-texto p{max-width:none}
+@media(max-width:760px){.intro-texto{max-width:100%}}
+.fecha{font-size:.85em;opacity:.8;margin-top:.3rem}
