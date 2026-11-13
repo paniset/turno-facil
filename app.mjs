@@ -1,7 +1,54 @@
-import { MAX_BACKUP_BYTES, parseBackup, schedule } from './logic.mjs';
+import { MAX_BACKUP_BYTES, addDays, cycle, longDate, parseBackup, schedule, shareText, shortDate, toCsv, weekStart } from './logic.mjs';
 import { EXAMPLES } from './ejemplos.mjs';
 const $ = id => document.getElementById(id);
-let plan = null, demo = false, nextId = 0;
+let plan = null, weeks = [], demo = false, nextId = 0;
+const PLAN_BUTTONS = ['export', 'print', 'csv', 'copy', 'share'];
+const setPlanButtons = disabled => PLAN_BUTTONS.forEach(id => { $(id).disabled = disabled; });
+const canShare = typeof globalThis.navigator?.share === 'function';
+$('share').hidden = !canShare;
+function clearShare() { $('share-status').textContent = ''; $('share-box').hidden = true; $('share-text').value = ''; }
+function clearCycle() { weeks = []; $('ciclo').hidden = true; $('ciclo-tabla').replaceChildren(); }
+function renderCycle() {
+  weeks = cycle(plan);
+  const first = weekStart(weeks[0]), last = addDays(weekStart(weeks.at(-1)), 6);
+  $('ciclo-title').textContent = `Cuadrante del ciclo (${weeks.length} semanas)`;
+  const table = document.createElement('table'); table.className = 'cuadrante ciclo-tabla';
+  const caption = document.createElement('caption');
+  caption.textContent = `Semanas ${weeks[0].week + 1}–${weeks.at(-1).week + 1}, del ${longDate(first)} al ${longDate(last)} · ${plan.aliases.join(', ')}${demo ? ' · DEMO' : ''}`;
+  const head = document.createElement('thead'), headRow = document.createElement('tr');
+  for (const text of ['Semana', ...plan.aliases]) { const th = document.createElement('th'); th.scope = 'col'; th.textContent = text; headRow.append(th); }
+  head.append(headRow);
+  const body = document.createElement('tbody');
+  for (const week of weeks) {
+    const row = document.createElement('tr'), th = document.createElement('th'); th.scope = 'row';
+    const from = weekStart(week), dates = document.createElement('span'); dates.className = 'carga';
+    dates.textContent = `${shortDate(from)}–${shortDate(addDays(from, 6))}`;
+    th.append(document.createTextNode(`Semana ${week.week + 1}`), dates);
+    if (week.week === plan.week) {
+      row.className = 'actual'; row.setAttribute('aria-current', 'true');
+      const mark = document.createElement('span'); mark.className = 'carga'; mark.textContent = 'Semana consultada'; th.append(mark);
+    }
+    row.append(th);
+    for (const person of week.assignments) {
+      const td = document.createElement('td'), list = document.createElement('ul');
+      for (const task of person.tasks) {
+        const li = document.createElement('li'), box = document.createElement('span');
+        box.className = 'casilla'; box.setAttribute('aria-hidden', 'true'); box.textContent = '☐ ';
+        li.append(box, document.createTextNode(`${task.name} (${task.minutes} min)`)); list.append(li);
+      }
+      if (!person.tasks.length) { const li = document.createElement('li'); li.textContent = 'Sin tareas'; list.append(li); }
+      const total = document.createElement('span'); total.className = 'carga'; total.textContent = `${person.minutes} min · ${person.load} puntos`;
+      td.append(list, total); row.append(td);
+    }
+    body.append(row);
+  }
+  table.append(caption, head, body);
+  $('ciclo-tabla').replaceChildren(table); $('ciclo').hidden = false;
+}
+function download(content, type, name) {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const link = document.createElement('a'); link.href = url; link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 // Un ejemplo abierto desde una guía es una plantilla: deja de ser DEMO al primer cambio.
 let template = false;
 let draftRevision = 0, importAttempt = 0;
@@ -19,7 +66,7 @@ function invalidate() {
   draftRevision++;
   if (template) { template = false; demo = false; $('demo-label').hidden = true; }
   clearErrors();
-  plan = null; $('results').replaceChildren(); $('export').disabled = $('print').disabled = true;
+  plan = null; $('results').replaceChildren(); clearCycle(); clearShare(); setPlanButtons(true);
   $('status').textContent = 'Hay cambios pendientes. Pulsa «Repartir esta semana».';
 }
 function addTask(task = { name: '', minutes: 20, weight: 1 }) {
@@ -61,7 +108,7 @@ function calculate(event) {
     }
     $('status').textContent = `Semana ${plan.week + 1} desde ${plan.start}. Fecha consultada: ${plan.date}. Diferencia de carga: ${maximum - Math.min(...plan.assignments.map(a => a.load))} puntos.`;
     $('demo-label').hidden = !demo;
-    $('export').disabled = $('print').disabled = false;
+    renderCycle(); clearShare(); setPlanButtons(false);
   } catch (error) {
     invalidate(); $('error').textContent = error.message;
     const row = $('tasks').children[error.taskIndex];
@@ -84,8 +131,30 @@ $('demo').onclick = () => { template = false; loadDemo(['Azul', 'Verde', 'Coral'
   [{name:'Cocina',minutes:30,weight:3},{name:'Compra',minutes:40,weight:2},{name:'Plantas',minutes:10,weight:1},{name:'Reciclaje',minutes:15,weight:2}]); };
 $('export').onclick = () => {
   if (!plan) return;
-  const url = URL.createObjectURL(new Blob([JSON.stringify({ version:1, demo, ...plan },null,2)],{type:'application/json'}));
-  const link = document.createElement('a'); link.href = url; link.download = `turno-facil-${plan.date}.json`; link.click(); setTimeout(() => URL.revokeObjectURL(url),1000);
+  download(JSON.stringify({ version:1, demo, ...plan },null,2), 'application/json', `turno-facil-${plan.date}.json`);
+};
+$('csv').onclick = () => {
+  if (!plan) return;
+  download(toCsv(weeks), 'text/csv;charset=utf-8', `turno-facil-${demo ? 'DEMO-' : ''}${plan.date}.csv`);
+};
+function showShareFallback(text) {
+  $('share-text').value = text; $('share-box').hidden = false;
+  $('share-text').focus(); $('share-text').select();
+  $('share-status').textContent = 'No se ha podido copiar solo. El texto está seleccionado: cópialo y pégalo en el grupo.';
+}
+$('copy').onclick = async () => {
+  if (!plan) return;
+  const text = shareText(plan, demo);
+  try {
+    await globalThis.navigator.clipboard.writeText(text);
+    $('share-box').hidden = true; $('share-status').textContent = 'Texto copiado. Pégalo en el grupo de WhatsApp.';
+  } catch { showShareFallback(text); }
+};
+$('share').onclick = async () => {
+  if (!plan || !canShare) return;
+  const text = shareText(plan, demo);
+  try { await globalThis.navigator.share({ text }); $('share-status').textContent = 'Turno compartido.'; }
+  catch (error) { if (error?.name !== 'AbortError') showShareFallback(text); }
 };
 function hasDraft() {
   if (plan || demo || $('aliases').value || $('start').value !== today || $('date').value !== today || $('tasks').children.length !== 1) return true;

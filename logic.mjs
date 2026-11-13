@@ -69,3 +69,46 @@ export function schedule(aliases, tasks, start, date) {
   }
   return { week, start, date, aliases: names, tasks: clean, assignments: names.map((alias, i) => ({ alias, ...buckets[(i - week % names.length + names.length) % names.length] })) };
 }
+
+// Fechas civiles AAAA-MM-DD; las semanas se cuentan desde el inicio, igual que en schedule().
+export function addDays(value, days) { return new Date(dateValue(value) + days * DAY).toISOString().slice(0, 10); }
+export const weekStart = plan => addDays(plan.start, 7 * plan.week);
+export const shortDate = iso => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+export const longDate = iso => `${shortDate(iso)}/${iso.slice(0, 4)}`;
+
+// Ciclo completo que contiene la semana consultada: tantas semanas como alias, todas calculadas con schedule().
+export function cycle(plan) {
+  const size = plan.aliases.length, first = plan.week - plan.week % size, weeks = [];
+  for (let week = first; week < first + size; week++) {
+    const date = addDays(plan.start, 7 * week);
+    if (!/^\d{4}-/.test(date)) break; // más allá del 31/12/9999
+    weeks.push(schedule(plan.aliases, plan.tasks, plan.start, date));
+  }
+  return weeks;
+}
+
+// CSV para Excel en español: BOM UTF-8, separador «;» y fórmulas neutralizadas con «'».
+const csvCell = value => {
+  let text = String(value);
+  if (/^\s*[=+\-@]|^[\t\r]/.test(text)) text = `'${text}`;
+  return /[;"\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+};
+export function toCsv(weeks) {
+  const rows = [['semana', 'desde', 'hasta', 'persona', 'tarea', 'minutos', 'peso', 'carga']];
+  for (const week of weeks) {
+    const from = weekStart(week), to = addDays(from, 6);
+    for (const person of week.assignments) {
+      for (const task of person.tasks) rows.push([week.week + 1, from, to, person.alias, task.name, task.minutes, task.weight, task.load]);
+    }
+  }
+  return '﻿' + rows.map(row => row.map(csvCell).join(';')).join('\r\n') + '\r\n';
+}
+
+// Texto breve para pegar en WhatsApp u otra app de mensajería.
+export function shareText(plan, demo = false) {
+  const lines = [`${demo ? '[DEMO] ' : ''}Turno de la semana ${plan.week + 1} (desde ${shortDate(weekStart(plan))}):`];
+  for (const person of plan.assignments) {
+    lines.push(`• ${person.alias}: ${person.tasks.length ? `${person.tasks.map(task => task.name).join(', ')} (${person.minutes} min)` : 'sin tareas'}`);
+  }
+  return lines.join('\n');
+}
