@@ -35,3 +35,15 @@ button{min-height:44px;min-width:44px}
 .ciclo-tabla tr{break-inside:avoid}.ciclo-tabla tr.actual>*{background:none}
 .ciclo-tabla ul{list-style:none;padding:0}.ciclo-tabla li{margin:0 0 2pt}.ciclo-tabla .casilla{display:inline}.ciclo-tabla .carga{color:#333;font-size:8pt}
 }
+.aviso-imprimir{background:#fff3c4;border-radius:8px;padding:10px 14px;font-size:.92rem}.indice ul{padding-left:20px;line-height:1.7}.indice a{color:var(--blue);font-weight:bold}.cuadrante:has(thead th:nth-child(6)){min-width:720px}
+@media print{
+@page plantilla{size:A4 landscape;margin:10mm}
+.plantillas article{max-width:none}.plantillas article>:not(.plantilla){display:none!important}
+.plantilla{page:plantilla}.plantilla~.plantilla{break-before:page}.plantilla .cta,.plantilla .tareas{display:none!important}
+.plantilla h2{font-size:14pt;margin:0 0 3pt}.plantilla .resumen{font-size:9pt;line-height:1.3;margin:0 0 4pt}
+.plantilla .tabla-scroll{overflow:visible;margin:0;border-radius:0}
+.plantilla .cuadrante{table-layout:fixed;font-size:9.5pt;line-height:1.3;min-width:0}.plantilla .cuadrante caption{padding:0 0 5pt;font-size:10pt}
+.plantilla .cuadrante th,.plantilla .cuadrante td{border:1px solid #555;padding:4pt 5pt}.plantilla .cuadrante thead th:first-child{width:22mm}
+.plantilla .cuadrante tr{break-inside:avoid}.plantilla .cuadrante ul{list-style:none;padding:0}.plantilla .cuadrante li{margin:0 0 2pt}
+.plantilla .cuadrante li::before{content:"☐ "}.plantilla .cuadrante .carga{color:#333;font-size:8pt}
+}
